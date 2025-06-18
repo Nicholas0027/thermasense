@@ -1,0 +1,10 @@
+# file: .gitignore
+# 忽略环境变量文件
+.env
+
+# 忽略Python缓存
+__pycache__/
+*.pyc
+
+# 忽略前端依赖文件夹
+client/node_modules

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ThermaSense - 实时监控面板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f9fafb; 
+            margin: 0;
+            padding: 2rem; 
+        }
+        .grid-container { 
+            display: grid;
+            /* 自动适配，每列最小500px，自动填充 */
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); 
+            gap: 2rem; 
+            width: 100%;
+            max-width: 1800px;
+            margin: auto;
+        }
+        .chart-container { 
+            width: 100%; 
+            padding: 2rem; 
+            background: white; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        h1, h2 { 
+            text-align: center; 
+            color: #111827; 
+        }
+        h1 { 
+            margin-bottom: 2rem; 
+            font-size: 2.25rem;
+        }
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>ThermaSense - 实时监控面板</h1>
+    <div id="charts-grid" class="grid-container">
+        <!-- 图表将会通过下方的JavaScript动态地添加到这里 -->
+    </div>
+
+    <script>
+        // 后端将会把实时数据注入到这个 all_history_data 变量中。
+        // Jinja2的'|safe'过滤器是必须的，以防止JSON字符串被HTML错误地转义。
+        const all_history_data = {{ history_data_json|safe }};
+
+        const chartsGrid = document.getElementById('charts-grid');
+
+        // 如果后端没有返回任何数据，则显示一条提示信息。
+        if (Object.keys(all_history_data).length === 0) {
+            chartsGrid.innerHTML = '<p style="text-align: center; color: #6b7280; font-size: 1.2rem;">暂无任何分区的历史数据可供显示。</p>';
+        } else {
+             // 遍历从后端获取的每一个分区数据
+            for (const zoneId in all_history_data) {
+                const zoneHistory = all_history_data[zoneId];
+
+                // 只有当该分区确实有历史数据时，才为其创建图表
+                if (zoneHistory.data && zoneHistory.data.length > 0) {
+                    const container = document.createElement('div');
+                    container.className = 'chart-container';
+                    // 使用从后端传来的中文名称作为图表标题
+                    container.innerHTML = `<h2>${zoneHistory.name} (最近1小时)</h2><canvas id="chart-${zoneId}"></canvas>`;
+                    chartsGrid.appendChild(container);
+
+                    const ctx = document.getElementById(`chart-${zoneId}`).getContext('2d');
+                    
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            datasets: [
+                                {
+                                    label: '当前温度',
+                                    // 将后端传来的ISO格式时间字符串转换为JavaScript的Date对象
+                                    data: zoneHistory.data.map(h => ({ x: new Date(h.timestamp), y: h.current_temp })),
+                                    borderColor: 'rgb(54, 162, 235)',
+                                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                                    tension: 0.1, // 使线条稍微平滑
+                                    fill: false,
+                                },
+                                {
+                                    label: '推荐温度',
+                                    data: zoneHistory.data.map(h => ({ x: new Date(h.timestamp), y: h.recommended_temp })),
+                                    borderColor: 'rgb(75, 192, 192)',
+                                    backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                                    borderDash: [5, 5], // 使用虚线样式以作区分
+                                    tension: 0.1,
+                                    fill: false,
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            scales: {
+                                x: {
+                                    type: 'time',
+                                    time: {
+                                        unit: 'minute',
+                                        tooltipFormat: 'HH:mm:ss', // 鼠标悬浮提示框中的时间格式
+                                        displayFormats: {
+                                            minute: 'HH:mm' // X轴坐标轴上的时间格式
+                                        }
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: '时间'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: '温度 (°C)'
+                                    },
+                                    // 建议Y轴的范围，可以根据您的实际温度范围调整
+                                    suggestedMin: 20,
+                                    suggestedMax: 30
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        // 5秒后自动刷新页面以获取最新数据
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+    </script>
+</body>
+</html>

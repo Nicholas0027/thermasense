@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+pydantic[email]
+python-dotenv # 新增：用于读取.env文件
+Jinja2 # 新增：用于HTML模板渲染
+gunicorn # 新增：生产级的Web服务器
